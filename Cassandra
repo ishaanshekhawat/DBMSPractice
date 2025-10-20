@@ -1,0 +1,176 @@
+Create a table friend to store following information:
+fid Int
+Fname Text
+Hobbies Set<text>
+Phno Map<text,text> {‘home’:’1111’,’office’:’2222’,’mobile’:4444}
+Partydt List<int> [2021,2019]
+Nickname Tuple<text,text> (‘Banya’,’rocks’)
+Fid is partition key
+Fname is cluster key
+
+
+CREATE TABLE friend (
+    fid int,
+    fname text,
+    hobbies set<text>,
+    phno map<text, text>,
+    partydt list<int>,
+    nickname tuple<text, text>,
+    PRIMARY KEY (fid, fname)
+);
+
+-- Inserting sample data
+INSERT INTO friend (fid, fname, hobbies, phno, partydt, nickname) VALUES (1, 'Rahul', {'reading', 'gaming'}, {'home':'1111', 'office':'2222', 'mobile':'4444'}, [2021, 2019, 2023], ('Banya', 'rocks'));
+INSERT INTO friend (fid, fname, hobbies, phno, partydt, nickname) VALUES (2, 'Rohit', {'coding'}, {'home':'5555', 'mobile':'6666'}, [2018, 2019], ('Rocky', 'star'));
+INSERT INTO friend (fid, fname, hobbies, phno, partydt, nickname) VALUES (3, 'Sameer', {'sports'}, {'mobile':'7777'}, [2020], ('Sam', 'boy'));
+INSERT INTO friend (fid, fname, hobbies, phno, partydt, nickname) VALUES (4, 'Raj', {'music'}, {'home':'8888'}, [2021], ('King', 'raj'));
+
+1. Add year 2022,2023 in party date for all friends with fid 3 or 4
+
+-- For fid 3 (Sameer)
+UPDATE friend SET partydt = partydt + [2022, 2023] WHERE fid = 3 AND fname = 'Sameer';
+
+-- For fid 4 (Raj)
+UPDATE friend SET partydt = partydt + [2022, 2023] WHERE fid = 4 AND fname = 'Raj';
+
+
+2. Replace home phone number of Rohit with 4444
+
+UPDATE friend SET phno = phno + {'home': '4444'} WHERE fid = 2 AND fname = 'Rohit';
+
+
+3. Add office phone number in Sameer’s phno
+
+UPDATE friend SET phno = phno + {'office': '3333'} WHERE fid = 3 AND fname = 'Sameer';
+
+
+4. Remove ‘home’ phno for friend with id 1
+
+UPDATE friend SET phno['home'] = null WHERE fid = 1 AND fname = 'Rahul';
+
+
+5. Remove year 2023 from partydt for fid1
+
+UPDATE friend SET partydt = partydt - [2023] WHERE fid = 1 AND fname = 'Rahul';
+
+
+6. Replace year 2019 from partydt with 2020 for fid 2
+
+-- Step 1: Remove 2019
+UPDATE friend SET partydt = partydt - [2019] WHERE fid = 2 AND fname = 'Rohit';
+
+-- Step 2: Append 2020 (assuming you want 2020 at the end)
+UPDATE friend SET partydt = partydt + [2020] WHERE fid = 2 AND fname = 'Rohit';
+
+
+7. Overwrite nicknames with (‘xxx’,’yyyy’) for fid 1
+
+UPDATE friend SET nickname = ('xxx', 'yyyy') WHERE fid = 1 AND fname = 'Rahul';
+
+
+8. Add ‘zzz’ nickname with fid 2
+
+-- Overwriting the existing tuple with 'zzz' as the first element
+UPDATE friend SET nickname = ('zzz', 'star') WHERE fid = 2 AND fname = 'Rohit';
+
+
+9. Remove ‘zzz’ nickname for friend with fname “Raj”
+
+UPDATE friend SET nickname = null WHERE fid = 4 AND fname = 'Raj';
+
+
+10. Remove all nicknames for fid 3
+
+UPDATE friend SET nickname = null WHERE fid = 3 AND fname = 'Sameer';
+
+2. Create table to store information about singer, use appropriate collections to store data
+Sid and name will be primary key
+Sid integer, name string, store list of songs he/she sung(list<text>), store list of music directors
+names and how many songs he sung with the director(map<text,int>), store names of
+studios(map<text,int>) where recordings have been done and how many times recording has been
+done in the studio, also store movie name, director name <text> and total number of songs < int> in
+the movie he/she sung.
+
+CREATE TABLE singer_info (
+    sid int,
+    name text,
+    songs list<text>,
+    music_directors map<text, int>, -- Director name -> song count
+    studios map<text, int>,         -- Studio name -> recording count
+    movies map<text, tuple<text, int>>, -- Movie name -> (Director name, Song count)
+    PRIMARY KEY (sid, name)
+);
+
+A. Write query to add new director name and count 1 in the table
+
+UPDATE singer_info
+SET music_directors = music_directors + {'Anu Malik': 1}
+WHERE sid = 1 AND name = 'sonu nigam';
+
+
+B. List all records of ‘sonu nigam’
+
+SELECT * FROM singer_info
+WHERE sid = 1 AND name = 'sonu nigam'; -- Assumes sid for Sonu Nigam is 1
+
+C. Add new studio in ‘shan’ and ‘shreya’s list
+
+-- For 'shan'
+UPDATE singer_info
+SET studios = studios + {'Yash Raj Studio': 1}
+WHERE sid = 2 AND name = 'shan';
+
+-- For 'shreya'
+UPDATE singer_info
+SET studios = studios + {'Yash Raj Studio': 1}
+WHERE sid = 3 AND name = 'shreya';
+
+D. Perform batch operation to insert 2 records and delete 1 record from above
+table
+
+BEGIN UNLOGGED BATCH
+    INSERT INTO singer_info (sid, name, songs) VALUES (4, 'Arijit', ['Tum Hi Ho']);
+    INSERT INTO singer_info (sid, name, songs) VALUES (5, 'Kishore', ['Mere Sapno Ki Rani']);
+    DELETE FROM singer_info WHERE sid = 3 AND name = 'shreya';
+APPLY BATCH;
+
+E. Delete list of studios and movies from above table from ‘shan’ and ‘sonu nigam’s
+record.
+
+-- For 'shan' (sid=2)
+UPDATE singer_info
+SET studios = null, movies = null
+WHERE sid = 2 AND name = 'shan';
+
+-- For 'sonu nigam' (sid=1)
+UPDATE singer_info
+SET studios = null, movies = null
+WHERE sid = 1 AND name = 'sonu nigam';
+
+3. Create a data type to store information about server. For each server store id, name, ram
+capacity. Create a table location to store bldgname,floor number and list of servers on the
+floor. Building name is primary key and floor number is cluster key
+
+-- 1. Create User-Defined Type for Server
+CREATE TYPE server_udt (
+    id int,
+    name text,
+    ram_capacity int
+);
+
+-- 2. Create Table Location
+CREATE TABLE location (
+    bldgname text,
+    floor_number int,
+    servers list<frozen<server_udt>>, -- Must be frozen since it's a collection of a UDT
+    PRIMARY KEY (bldgname, floor_number)
+);
+
+a. Find list of all servers from ‘A’ building and floor number > 5
+
+SELECT servers FROM location
+WHERE bldgname = 'A' AND floor_number > 5;
+
+b. Find list of all servers from ‘A’,’B’,’C’ building.
+SELECT servers FROM location
+WHERE bldgname IN ('A', 'B', 'C');
