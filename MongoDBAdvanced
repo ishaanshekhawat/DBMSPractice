@@ -1,0 +1,308 @@
+Assuming your collection is named books.
+
+MongoDB CRUD and Query Operations (1-14)
+1. Find all books whose author is "Faisal Abid" and display name of book authors and categories
+JavaScript
+
+db.books.find(
+    { "authors": "Faisal Abid" },
+    { "authors": 1, "categories": 1, "_id": 0 }
+)
+
+2. List all the books with category "Internet" at first position in category array
+JavaScript
+
+db.books.find(
+    { "categories.0": "Internet" }
+)
+
+3. Change the status of books to “undergoing change” for books having more than 500 pages and published in 2009
+JavaScript
+
+db.books.updateMany(
+    {
+        "pageCount": { "$gt": 500 },
+        "publishedDate": {
+            "$gte": ISODate("2009-01-01T00:00:00Z"),
+            "$lt": ISODate("2010-01-01T00:00:00Z")
+        }
+    },
+    {
+        "$set": { "status": "undergoing change" }
+    }
+)
+
+4. Find all the books containing word "highlighting" and "depth" in long description of the book
+JavaScript
+
+db.books.find(
+    { "longDescription": { "$all": [ /highlighting/i, /depth/i ] } }
+    // Alternatively, using $and for regex:
+    // { $and: [
+    //     { "longDescription": /highlighting/i },
+    //     { "longDescription": /depth/i }
+    // ]}
+)
+
+5. Display all books published in 2009
+JavaScript
+
+db.books.find(
+    {
+        "publishedDate": {
+            "$gte": ISODate("2009-01-01T00:00:00Z"),
+            "$lt": ISODate("2010-01-01T00:00:00Z")
+        }
+    }
+)
+
+6. Find all books with pageCount is either 500 or 556 or 670
+JavaScript
+
+db.books.find(
+    { "pageCount": { "$in": [500, 556, 670] } }
+)
+
+7. Add 2 categories “kindle” and “hard bind” in all the books if its pageCount 200 and $\< 500$ or number of pages 500
+JavaScript
+
+db.books.updateMany(
+    {
+        "$or": [
+            { "pageCount": { "$gt": 200, "$lt": 500 } },
+            { "pageCount": { "$gt": 500 } }
+        ]
+    },
+    {
+        "$addToSet": { "categories": { "$each": ["kindle", "hard bind"] } }
+    }
+)
+
+8. List all the books which has thumbnailUrl key
+JavaScript
+
+db.books.find(
+    { "thumbnailUrl": { "$exists": true } }
+)
+
+9. Add key type with values ["fiction", "moral stories", "adventurous"] in all books whose title starts with 'Fl' and contains 'a' somewhere in the name
+JavaScript
+
+db.books.updateMany(
+    {
+        "title": { "$regex": "^Fl.*a.*" }
+    },
+    {
+        "$set": { "type": ["fiction", "moral stories", "adventurous"] }
+    }
+)
+
+11. Add new author “myauthor” at position 2 for all books whose title starts with 'h' or 'm' and contains 's' at 2nd last position
+The 2nd last position means the character just before the end of the string.
+
+db.books.updateMany(
+    {
+        "title": { "$regex": "^[hm].*s.$" } // Title starts with h or m, and has 's' followed by any single character
+    },
+    {
+        "$push": {
+            "authors": {
+                "$each": ["myauthor"],
+                "$position": 1 // position 1 is the second element (0-indexed)
+            }
+        }
+    }
+)
+
+12. Increase pageCount by 100 for all books whose author at 1st position is “Gal Shachor”
+
+db.books.updateMany(
+    { "authors.0": "Gal Shachor" },
+    { "$inc": { "pageCount": 100 } }
+)
+
+13. Overwrite "Magnus Rydin" with name "Fr" (in the authors array). This requires identifying the index of "Magnus Rydin" and then using the array index to update.
+
+// Step 1: Find the book(s) and the index of the author (e.g., using $[] or $ )
+// This is a common pattern for array updates in MQL:
+
+db.books.updateMany(
+    { "authors": "Magnus Rydin" },
+    { "$set": { "authors.$": "Fr" } } // $ is the positional operator, updates the first matching element
+)
+
+14. List all books title, status, pageCount, comments for all books with pages 300 or $\< 500$ or title starts with 'a' or isbn starts with '193'
+Note: $\text{pages \> 300 or \< 500}$ is logically equivalent to pages  300 (since page counts are non-negative integers). Assuming the user meant $\text{pages \< 300 or pages \> 500}$.
+
+db.books.find(
+    {
+        "$or": [
+            { "pageCount": { "$lt": 500 } }, // Assuming the logic intended for the first part
+            // { "pageCount": { "$lt": 300 } }, // Alternative interpretation
+            // { "pageCount": { "$gt": 500 } }, // Alternative interpretation
+            { "title": { "$regex": "^a", "$options": "i" } },
+            { "isbn": { "$regex": "^193" } }
+        ]
+    },
+    { "title": 1, "status": 1, "pageCount": 1, "comments": 1, "_id": 0 }
+)
+
+MongoDB Aggregation Queries (1-9)
+
+1. Display pageCount of books = (pageCount $\* 100 + ($pageCount of all books with isbn number starting with 193
+
+db.books.aggregate([
+    {
+        "$match": {
+            "isbn": { "$regex": "^193" }
+        }
+    },
+    {
+        "$project": {
+            "_id": 0,
+            "title": 1,
+            "originalPageCount": "$pageCount",
+            "calculatedPageCount": {
+                "$add": [
+                    { "$multiply": ["$pageCount", 100] },
+                    { "$mod": ["$pageCount", 7] }
+                ]
+            }
+        }
+    }
+])
+
+2. Display book code as first 3 characters of title followed by 4, 5, 6 character of isbn number
+
+db.books.aggregate([
+    {
+        "$project": {
+            "_id": 0,
+            "title": 1,
+            "isbn": 1,
+            "bookCode": {
+                "$concat": [
+                    { "$substrCP": ["$title", 0, 3] }, // First 3 characters of title
+                    { "$substrCP": ["$isbn", 3, 3] }   // 3 characters starting from index 3 (4th char)
+                ]
+            }
+        }
+    }
+])
+
+3. Find sum, maximum, minimum of pageCount for all books
+
+db.books.aggregate([
+    {
+        "$group": {
+            "_id": null,
+            "totalPageCount": { "$sum": "$pageCount" },
+            "maxPageCount": { "$max": "$pageCount" },
+            "minPageCount": { "$min": "$pageCount" }
+        }
+    }
+])
+
+4. Find sum, maximum, minimum, count of pageCount for all books categorywise and arrange it on count
+
+db.books.aggregate([
+    { "$unwind": "$categories" }, // Deconstructs the categories array
+    {
+        "$group": {
+            "_id": "$categories",
+            "count": { "$sum": 1 },
+            "totalPageCount": { "$sum": "$pageCount" },
+            "maxPageCount": { "$max": "$pageCount" },
+            "minPageCount": { "$min": "$pageCount" }
+        }
+    },
+    {
+        "$sort": { "count": -1 } // Arrange by count descending
+    }
+])
+
+5. Display all books written by "Faisal Abid" display title, number of pages and author name. don’t display all author names
+
+db.books.aggregate([
+    {
+        "$match": { "authors": "Faisal Abid" }
+    },
+    {
+        "$project": {
+            "_id": 0,
+            "title": 1,
+            "pageCount": 1,
+            "mainAuthor": { // Display only the first author or a simplified representation
+                "$arrayElemAt": ["$authors", 0]
+            }
+        }
+    }
+])
+
+6. Display book name, pages, isbn number and state as “old” if book is published before 2010 otherwise display “in stock”
+
+db.books.aggregate([
+    {
+        "$project": {
+            "_id": 0,
+            "title": 1,
+            "pageCount": 1,
+            "isbn": 1,
+            "state": {
+                "$cond": {
+                    "if": { "$lt": ["$publishedDate", ISODate("2010-01-01T00:00:00Z")] },
+                    "then": "old",
+                    "else": "in stock"
+                }
+            }
+        }
+    }
+])
+
+7. Display 3 books with lowest number of pages published in 2010 or in 2011 or in 2012 arrange it on title.
+
+db.books.aggregate([
+    {
+        "$match": {
+            "publishedDate": {
+                "$gte": ISODate("2010-01-01T00:00:00Z"),
+                "$lt": ISODate("2013-01-01T00:00:00Z")
+            }
+        }
+    },
+    { "$sort": { "pageCount": 1 } }, // Sort by lowest pages first
+    { "$limit": 3 },
+    { "$sort": { "title": 1 } }, // Arrange on title
+    { "$project": { "_id": 0, "title": 1, "pageCount": 1 } }
+])
+
+8. List 3rd highest, 4th highest, and 5th highest books according to number of pages arrange it on title. Display only title, isbn, pages
+
+db.books.aggregate([
+    { "$sort": { "pageCount": -1 } }, // Sort by highest pages first
+    { "$skip": 2 }, // Skip the 1st and 2nd highest (i.e., start at 3rd highest)
+    { "$limit": 3 }, // Take the next three (3rd, 4th, 5th)
+    { "$sort": { "title": 1 } }, // Arrange on title
+    { "$project": { "_id": 0, "title": 1, "isbn": 1, "pageCount": 1 } }
+])
+
+9. Find sum of pageCount for all books categorywise if its title contains 'a' or 'm' and isbn contains number 7.
+
+db.books.aggregate([
+    {
+        "$match": {
+            "$or": [
+                { "title": { "$regex": "a", "$options": "i" } },
+                { "title": { "$regex": "m", "$options": "i" } }
+            ],
+            "isbn": { "$regex": "7" }
+        }
+    },
+    { "$unwind": "$categories" },
+    {
+        "$group": {
+            "_id": "$categories",
+            "totalPageCount": { "$sum": "$pageCount" }
+        }
+    }
+])
