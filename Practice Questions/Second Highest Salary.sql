@@ -3,7 +3,10 @@
 
 -- It's possible that multiple employees may share the same second highest salary. In case of duplicate, display the salary only once.
 
-SELECT DISTINCT salary as second_highest_salary
-FROM employee
-order BY salary desc
-LIMIT 1,1;
+SELECT 
+    (
+        SELECT DISTINCT salary
+        FROM Employee
+        ORDER BY salary DESC
+        LIMIT 1 OFFSET 1
+    ) AS SecondHighestSalary;
